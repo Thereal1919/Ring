@@ -3,204 +3,589 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ring Connection Test</title>
+<title>My Ring</title>
 <style>
-  :root { --bg:#0f1115; --card:#1a1d24; --text:#e8eaf0; --muted:#9aa1ad; --accent:#7aa2ff; --good:#4cc38a; --warn:#f2b84b; --bad:#ef6b6b; }
+  :root { --bg:#0f1115; --card:#1a1d24; --text:#e8eaf0; --muted:#9aa1ad; --accent:#7aa2ff; --good:#4cc38a; --warn:#f2b84b; --bad:#ef6b6b; --line:#262a33; }
   * { box-sizing: border-box; }
   body { margin:0; font-family:-apple-system, system-ui, sans-serif; background:var(--bg); color:var(--text); padding:20px; line-height:1.45; }
-  h1 { font-size:22px; margin:4px 0 6px; }
-  p.sub { color:var(--muted); margin:0 0 18px; font-size:15px; }
+  h1 { font-size:24px; margin:4px 0 4px; }
+  h2 { font-size:17px; margin:0 0 8px; }
+  p { margin:0 0 10px; }
+  .sub { color:var(--muted); font-size:15px; margin-bottom:16px; }
   .card { background:var(--card); border-radius:14px; padding:16px; margin-bottom:14px; }
-  button { width:100%; font-size:17px; font-weight:600; padding:14px; border:0; border-radius:12px; background:var(--accent); color:#0b0d12; }
+  .muted { color:var(--muted); font-size:14px; }
+  button { width:100%; font-size:17px; font-weight:600; padding:14px; border:0; border-radius:12px; background:var(--accent); color:#0b0d12; margin-top:6px; }
   button:disabled { opacity:.5; }
-  button.secondary { background:#2a2f3a; color:var(--text); font-weight:500; font-size:15px; padding:10px; margin-top:10px; }
-  .status { font-size:17px; font-weight:600; margin-bottom:6px; }
+  button.secondary { background:#2a2f3a; color:var(--text); font-weight:500; font-size:15px; padding:11px; }
+  button.danger { background:#3a2226; color:#ffb3b3; font-weight:500; font-size:15px; padding:11px; }
+  .status { font-size:18px; font-weight:600; margin-bottom:4px; }
   .good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
-  .row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #262a33; font-size:15px; }
+  .row { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); font-size:15px; }
   .row:last-child { border-bottom:0; }
   .row span:first-child { color:var(--muted); }
-  .row span:last-child { text-align:right; font-weight:500; max-width:60%; word-break:break-all; }
-  pre { background:#111318; color:#b9c0cc; font-size:11px; padding:10px; border-radius:10px; white-space:pre-wrap; word-break:break-all; max-height:220px; overflow:auto; margin:0; }
+  .row span:last-child { text-align:right; font-weight:500; word-break:break-word; }
+  .bar { height:8px; background:#2a2f3a; border-radius:6px; overflow:hidden; margin-top:10px; }
+  .bar > div { height:100%; width:0; background:var(--accent); transition:width .3s; }
+  pre { background:#111318; color:#b9c0cc; font-size:11px; padding:10px; border-radius:10px; white-space:pre-wrap; word-break:break-all; max-height:240px; overflow:auto; margin:0; }
+  code.key { display:block; background:#111318; padding:10px; border-radius:10px; font-size:13px; word-break:break-all; margin:8px 0; }
+  input { width:100%; font-size:15px; padding:10px; border-radius:10px; border:1px solid #333a46; background:#111318; color:var(--text); margin-top:6px; }
   ol { padding-left:20px; margin:6px 0 0; color:var(--muted); font-size:14px; }
+  details summary { cursor:pointer; color:var(--muted); font-size:15px; }
   .hidden { display:none; }
 </style>
 </head>
 <body>
-  <h1>Ring Connection Test</h1>
-  <p class="sub">Checks whether your iPhone can talk to your Oura ring. Read-only — it doesn't change anything on the ring.</p>
+  <h1>My Ring</h1>
+  <p class="sub">Your Oura ring, read directly over Bluetooth. Your data stays on this phone.</p>
 
-  <div class="card" id="before">
-    <div class="status">Before you tap the button</div>
+  <!-- Shown until the ring is set up -->
+  <div class="card hidden" id="setupCard">
+    <h2>Set up your ring</h2>
+    <p class="muted">Only do this after your ring has been factory reset.</p>
     <ol>
-      <li>Open this page in the <b>Bluefy</b> app (not Safari).</li>
-      <li>Force-close the Oura app (swipe it away).</li>
-      <li>Have the ring on your finger or on its charger, near the phone.</li>
+      <li>Open this page in <b>Bluefy</b>.</li>
+      <li>Ring on the charger or your finger, close to the phone.</li>
+      <li>If your iPhone asks to <b>Pair</b>, tap Pair.</li>
     </ol>
+    <button id="setupBtn">Set up my ring</button>
+    <button class="secondary" id="setupAllBtn">Ring not in the list? Show all devices</button>
   </div>
 
-  <button id="go">Find my ring</button>
+  <!-- Shown once set up -->
+  <div class="card hidden" id="syncCard">
+    <h2>Sync</h2>
+    <p class="muted" id="lastSync">Not synced yet.</p>
+    <button id="syncBtn">Sync now</button>
+    <div class="bar hidden" id="barWrap"><div id="bar"></div></div>
+  </div>
 
-  <div class="card hidden" id="resultCard" style="margin-top:14px">
+  <div class="card hidden" id="resultCard">
     <div class="status" id="status"></div>
-    <div id="explain" style="color:var(--muted);font-size:14px;margin-bottom:8px"></div>
+    <div class="muted" id="explain" style="margin-bottom:8px"></div>
     <div id="rows"></div>
   </div>
 
+  <div class="card hidden" id="dataCard">
+    <h2>Data on this phone</h2>
+    <div id="dataRows"></div>
+  </div>
+
+  <div class="card hidden" id="keyCard">
+    <details>
+      <summary>Ring key (backup)</summary>
+      <p class="muted" style="margin-top:8px">This key is how your phone unlocks your ring. Save a copy in your Notes app. If Bluefy's data is ever cleared, paste it below to get back in without resetting the ring.</p>
+      <code class="key" id="keyShow"></code>
+      <button class="secondary" id="copyKey">Copy key</button>
+      <input id="keyInput" placeholder="Paste a saved key (32 characters)" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="secondary" id="restoreKey">Use this key</button>
+      <button class="danger" id="forget">Forget ring and data on this phone</button>
+    </details>
+  </div>
+
   <div class="card hidden" id="logCard">
-    <div style="font-size:14px;color:var(--muted);margin-bottom:8px">Technical log (copy and paste this to Claude)</div>
-    <pre id="log"></pre>
-    <button class="secondary" id="copy">Copy log</button>
+    <details id="logDetails">
+      <summary>Technical log (for Claude)</summary>
+      <pre id="log" style="margin-top:8px"></pre>
+      <button class="secondary" id="copyLog">Copy log</button>
+    </details>
   </div>
 
 <script>
+'use strict';
+// ---------------- constants ----------------
 const SVC   = '98ed0001-a541-11e4-b6a0-0002a5d5c51b';
 const WRITE = '98ed0002-a541-11e4-b6a0-0002a5d5c51b';
 const NOTIF = '98ed0003-a541-11e4-b6a0-0002a5d5c51b';
+const QUIET_MS = 1500;          // wait this long after the last reply before giving up
+const DRAIN_QUIET_MS = 6000;    // more patient for data batches
+const EXT_BATCH_MAX = 4096;
+const MAX_TAIL_PASSES = 3;
+const TAIL_BATCH_EVENTS = 32;
+const MAX_ADVANCE_DS = 180 * 24 * 60 * 60 * 10;
 
+const EVENT_NAMES = {0x41:'ring_start',0x42:'time_sync',0x43:'debug_event',0x44:'ibi_event',0x45:'state_change',0x46:'temp_event',0x47:'motion_event',0x48:'sleep_period_information',0x49:'sleep_summary_1',0x4a:'ppg_amplitude',0x4b:'sleep_phase_information',0x4c:'sleep_summary_2',0x4d:'ring_sleep_feature_information',0x4e:'sleep_phase_details',0x4f:'sleep_summary_3',0x50:'activity_information',0x51:'activity_summary_1',0x52:'activity_summary_2',0x53:'wear_event',0x54:'recovery_summary',0x55:'sleep_heart_rate',0x56:'alert_event',0x57:'ring_sleep_feature_information_2',0x58:'sleep_summary_4',0x59:'eda_event',0x5a:'sleep_phase_data',0x5b:'ble_connection',0x5c:'user_information',0x5d:'hrv_event',0x5e:'self_test_event',0x5f:'raw_acm_event',0x60:'ibi_and_amplitude_event',0x61:'debug_data',0x62:'on_demand_meas',0x63:'ppg_peak_event',0x64:'raw_ppg_event',0x65:'on_demand_session',0x66:'on_demand_motion',0x67:'raw_ppg_summary',0x68:'raw_ppg_data',0x69:'temp_period',0x6a:'sleep_period_information_2',0x6b:'motion_period',0x6c:'feature_session',0x6d:'meas_quality_event',0x6e:'spo2_ibi_and_amplitude_event',0x6f:'spo2_event',0x70:'spo2_smoothed_event',0x71:'green_ibi_and_amplitude_event',0x72:'sleep_acm_period',0x73:'ehr_trace_event',0x74:'ehr_acm_intensity_event',0x75:'sleep_temp_event',0x76:'bedtime_period',0x77:'spo2_dc_event',0x79:'self_test_data_event',0x7a:'tag_event',0x7e:'real_step_event_feature_1',0x7f:'real_step_event_feature_2',0x80:'green_ibi_quality_event',0x81:'cva_raw_ppg_data',0x8b:'spo2_r_pi_event',0x82:'scan_start',0x83:'scan_end',0x85:'rtc_beacon'};
+const CATEGORIES = [
+  ['Sleep',        [0x48,0x49,0x4b,0x4c,0x4d,0x4e,0x4f,0x57,0x58,0x5a,0x6a,0x72,0x75,0x76]],
+  ['Heart / HRV',  [0x44,0x55,0x5d,0x60,0x71,0x80,0x73,0x74]],
+  ['Temperature',  [0x46,0x69]],
+  ['Activity',     [0x47,0x50,0x51,0x52,0x6b,0x7e,0x7f]],
+  ['Blood oxygen', [0x6e,0x6f,0x70,0x77,0x8b]],
+];
+
+// ---------------- helpers ----------------
 const $ = id => document.getElementById(id);
+const hex = b => Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+const fromHex = s => new Uint8Array((s.match(/../g) || []).map(h => parseInt(h, 16)));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const u32 = (b, i) => (b[i] | (b[i+1] << 8) | (b[i+2] << 16) | (b[i+3] << 24)) >>> 0;
+const u16 = (b, i) => b[i] | (b[i+1] << 8);
+const le32 = n => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+function le64(n) { const lo = n % 4294967296, hi = Math.floor(n / 4294967296); return [...le32(lo), ...le32(hi)]; }
+
 const logLines = [];
 function log(msg) {
-  const t = new Date().toLocaleTimeString();
-  logLines.push(`[${t}] ${msg}`);
+  logLines.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+  if (logLines.length > 600) logLines.splice(0, logLines.length - 600);
   $('logCard').classList.remove('hidden');
   $('log').textContent = logLines.join('\n');
 }
-const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-const fromHex = s => new Uint8Array(s.match(/../g).map(h => parseInt(h, 16)));
-const ascii = bytes => Array.from(bytes).filter(b => b >= 32 && b < 127).map(b => String.fromCharCode(b)).join('').trim();
-
 function setStatus(text, cls, explain) {
   $('resultCard').classList.remove('hidden');
   $('status').textContent = text;
-  $('status').className = 'status ' + cls;
+  $('status').className = 'status ' + (cls || '');
   $('explain').textContent = explain || '';
 }
-function addRow(label, value) {
+function addRow(target, label, value) {
   const d = document.createElement('div');
   d.className = 'row';
   d.innerHTML = '<span></span><span></span>';
   d.children[0].textContent = label;
   d.children[1].textContent = value;
-  $('rows').appendChild(d);
+  $(target).appendChild(d);
+}
+function progress(pct) {
+  $('barWrap').classList.remove('hidden');
+  $('bar').style.width = Math.max(3, Math.min(100, pct)) + '%';
 }
 
-// Send one command and wait for the first reply (or time out)
-let pending = null;
-function onNotify(e) {
-  const v = new Uint8Array(e.target.value.buffer);
-  log('<- ' + hex(v));
-  if (pending) { const p = pending; pending = null; p(v); }
-}
-async function send(ch, cmdHex, label) {
-  log(`-> ${cmdHex}  (${label})`);
-  const reply = new Promise(res => {
-    pending = res;
-    setTimeout(() => { if (pending === res) { pending = null; res(null); } }, 3000);
+// ---------------- local storage (key + cursor) ----------------
+const store = {
+  get(k) { try { return localStorage.getItem('ring.' + k); } catch (_) { return null; } },
+  set(k, v) { try { localStorage.setItem('ring.' + k, v); return true; } catch (_) { return false; } },
+  del(k) { try { localStorage.removeItem('ring.' + k); } catch (_) {} },
+};
+
+// ---------------- IndexedDB (events) ----------------
+let dbp = null;
+function db() {
+  if (dbp) return dbp;
+  dbp = new Promise((res, rej) => {
+    const r = indexedDB.open('myring', 1);
+    r.onupgradeneeded = () => {
+      const os = r.result.createObjectStore('events', { keyPath: 'id' });
+      os.createIndex('tag', 'tag');
+      os.createIndex('ts', 'ts');
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
   });
-  const data = fromHex(cmdHex);
-  try {
-    if (ch.writeValueWithResponse) await ch.writeValueWithResponse(data);
-    else await ch.writeValue(data);
-  } catch (err) {
-    log('write failed: ' + err.message);
-    if (ch.writeValueWithoutResponse) await ch.writeValueWithoutResponse(data);
+  return dbp;
+}
+async function saveEvents(events) {
+  if (!events.length) return;
+  const d = await db();
+  await new Promise((res, rej) => {
+    const tx = d.transaction('events', 'readwrite');
+    const os = tx.objectStore('events');
+    for (const e of events) os.put({ id: e.tag + ':' + e.ts + ':' + e.body, tag: e.tag, ts: e.ts, body: e.body });
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  });
+}
+async function allEvents() {
+  const d = await db();
+  return new Promise((res, rej) => {
+    const r = d.transaction('events').objectStore('events').getAll();
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function clearEvents() {
+  const d = await db();
+  await new Promise(res => { const tx = d.transaction('events', 'readwrite'); tx.objectStore('events').clear(); tx.oncomplete = res; });
+}
+
+// ---------------- crypto: AES-128/ECB/PKCS7 of the nonce ----------------
+async function encryptNonce(keyBytes, nonce) {
+  const block = new Uint8Array(16);
+  const n = Math.min(16, nonce.length);
+  block.set(nonce.slice(0, n));
+  for (let i = n; i < 16; i++) block[i] = 16 - n;
+  // One AES-CBC block with a zero IV is exactly one AES-ECB block.
+  const k = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['encrypt']);
+  const out = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-CBC', iv: new Uint8Array(16) }, k, block));
+  return out.slice(0, 16);
+}
+
+// ---------------- packets ----------------
+function parseMany(frame) {
+  const out = [];
+  let i = 0;
+  while (i + 2 <= frame.length) {
+    const tag = frame[i], len = frame[i + 1], end = i + 2 + len;
+    if (end > frame.length) break;
+    out.push({ tag, payload: frame.slice(i + 2, end) });
+    i = end;
   }
-  return reply;
+  if (!out.length && frame.length >= 2) out.push({ tag: frame[0], payload: frame.slice(2) });
+  return out;
 }
+const isExt = (p, ext) => p.tag === 0x2f && p.payload[0] === ext;
 
-const LOCKED = '2f022f01';
-
-function parseFirmware(r) {
-  // 09 12 | api(3) fw(3) bootloader(3) bt(3) mac(6, reversed)
-  if (!r || r[0] !== 0x09 || r.length < 14) return null;
-  const p = r.slice(2);
-  const v = (a, b, c) => `${a}.${b}.${c}`;
-  return { api: v(p[0], p[1], p[2]), fw: v(p[3], p[4], p[5]), bt: v(p[9], p[10], p[11]) };
-}
-function parseString(r) {
-  // 19 11 00 <ascii...>
-  if (!r || r[0] !== 0x19 || r.length < 4) return null;
-  return ascii(r.slice(3)) || null;
-}
-function modelFromHardware(hw) {
-  if (!hw) return 'Unknown';
-  if (/^(ORE|JAD)_/.test(hw)) return 'Oura Ring 4';
-  if (/^BLB_/.test(hw)) return 'Oura Ring Gen3';
-  return 'Oura ring (' + hw + ')';
-}
-
-$('go').onclick = async () => {
-  $('rows').innerHTML = '';
-  logLines.length = 0;
-  if (!navigator.bluetooth) {
-    setStatus('Bluetooth isn’t available here', 'bad',
-      'Safari and Chrome on iPhone can’t use Bluetooth from a web page. Open this same link inside the free Bluefy app.');
-    return;
-  }
-  $('go').disabled = true;
-  let device;
-  try {
-    setStatus('Looking for your ring…', 'warn', 'Pick your ring from the list that pops up (it starts with “Oura”).');
-    device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [SVC] }, { namePrefix: 'Oura' }],
-      optionalServices: [SVC]
-    });
-    log('picked device: ' + (device.name || '(no name)'));
-
-    setStatus('Connecting…', 'warn');
-    const server = await device.gatt.connect();
-    log('connected');
+// ---------------- BLE link ----------------
+class Ring {
+  constructor() { this.device = null; this.wr = null; this.listener = null; }
+  async connect(showAll) {
+    if (!navigator.bluetooth) throw new Error('NO_BLUETOOTH');
+    this.device = await navigator.bluetooth.requestDevice(showAll
+      ? { acceptAllDevices: true, optionalServices: [SVC] }
+      : { filters: [{ services: [SVC] }, { namePrefix: 'Oura' }], optionalServices: [SVC] });
+    log('picked: ' + (this.device.name || '(no name)'));
+    const server = await this.device.gatt.connect();
     const svc = await server.getPrimaryService(SVC);
-    const wr = await svc.getCharacteristic(WRITE);
+    this.wr = await svc.getCharacteristic(WRITE);
     const nt = await svc.getCharacteristic(NOTIF);
-    nt.addEventListener('characteristicvaluechanged', onNotify);
+    nt.addEventListener('characteristicvaluechanged', e => {
+      const v = new Uint8Array(e.target.value.buffer.slice(e.target.value.byteOffset, e.target.value.byteOffset + e.target.value.byteLength));
+      if (this.listener) this.listener(v);
+    });
     await nt.startNotifications();
-    log('listening for replies');
-
-    const fwR  = await send(wr, '0803000000', 'firmware');
-    const hwR  = await send(wr, '1803180010', 'hardware id');
-    const snR  = await send(wr, '1803080010', 'serial');
-    const batR = await send(wr, '0c00', 'battery');
-
-    const fw = parseFirmware(fwR);
-    const hw = parseString(hwR);
-    const sn = parseString(snR);
-    const anyReply = fwR || hwR || snR || batR;
-
-    if (!anyReply) {
-      setStatus('Connected, but the ring didn’t answer', 'warn',
-        'Your phone found the ring but got no replies. Copy the log below and send it to Claude.');
-    } else {
-      setStatus('✅ Your phone can talk to your ring', 'good',
-        'This is the green light. Copy the log below and send it to Claude for the next step.');
-    }
-    addRow('Model', modelFromHardware(hw));
-    if (hw) addRow('Hardware ID', hw);
-    if (fw) addRow('Firmware', fw.fw);
-    if (sn) addRow('Serial', sn.replace(/.(?=.{4})/g, '•'));
-    if (batR) {
-      if (hex(batR) === LOCKED) addRow('Health data', 'Locked to the Oura app (expected)');
-      else if (batR[0] === 0x0d) addRow('Battery', batR[2] + '%');
-    }
-    try { device.gatt.disconnect(); log('disconnected'); } catch (_) {}
-  } catch (err) {
-    log('error: ' + err.name + ': ' + err.message);
-    let explain = 'Copy the log below and send it to Claude.';
-    if (/cancel/i.test(err.message) || err.name === 'NotFoundError')
-      explain = 'No ring was picked. Make sure the Oura app is fully closed, then try again. If your ring never shows up in the list, send Claude the log.';
-    else if (/encrypt|auth|security/i.test(err.message))
-      explain = 'The ring refused because it’s paired to the Oura app. That’s useful to know — send Claude the log.';
-    setStatus('Didn’t work this time', 'bad', explain);
-  } finally {
-    $('go').disabled = false;
+    log('connected');
   }
+  disconnect() { try { this.device && this.device.gatt.disconnect(); } catch (_) {} }
+  async write(bytes) {
+    const data = Uint8Array.from(bytes);
+    if (this.wr.writeValueWithResponse) await this.wr.writeValueWithResponse(data);
+    else await this.wr.writeValue(data);
+  }
+  // Send a command; collect reply packets until `done(packet)` is true or the line goes quiet.
+  request(bytes, done, quietMs = QUIET_MS, label = '') {
+    return new Promise(async (resolve, reject) => {
+      const packets = [];
+      let timer = null, finished = false, frames = 0;
+      const finish = () => { if (finished) return; finished = true; clearTimeout(timer); this.listener = null; resolve(packets); };
+      const arm = () => { clearTimeout(timer); timer = setTimeout(finish, quietMs); };
+      this.listener = frame => {
+        frames++;
+        if (frames <= 6 || !label.startsWith('events')) log('<- ' + hex(frame).slice(0, 120) + (frame.length > 60 ? '…' : ''));
+        const ps = parseMany(frame);
+        packets.push(...ps);
+        if (done && ps.some(done)) finish(); else arm();
+      };
+      log('-> ' + (/key|authenticate/.test(label) ? hex(bytes).slice(0, 4) + '…' : hex(bytes)) + (label ? '  (' + label + ')' : ''));
+      arm();
+      try { await this.write(bytes); } catch (e) { finished = true; clearTimeout(timer); this.listener = null; reject(e); }
+    });
+  }
+}
+
+// ---------------- ring operations ----------------
+async function authenticate(ring, key) {
+  const a = await ring.request([0x2f, 0x01, 0x2b], p => isExt(p, 0x2c), QUIET_MS, 'auth nonce');
+  const np = a.find(p => isExt(p, 0x2c));
+  if (!np) throw new Error('AUTH_NO_NONCE');
+  const enc = await encryptNonce(key, np.payload.slice(1));
+  const b = await ring.request([0x2f, 0x11, 0x2d, ...enc], p => isExt(p, 0x2e), QUIET_MS, 'authenticate');
+  const r = b.find(p => isExt(p, 0x2e));
+  const state = r ? r.payload[1] : null;
+  log('auth result: ' + state);
+  if (state === 0) return;
+  if (state === 1) throw new Error('AUTH_WRONG_KEY');
+  if (state === 2) throw new Error('AUTH_RING_RESET');
+  if (state === 3) throw new Error('AUTH_OTHER_DEVICE');
+  throw new Error('AUTH_FAILED_' + state);
+}
+async function battery(ring) {
+  const p = (await ring.request([0x0c, 0x00], p => p.tag === 0x0d, QUIET_MS, 'battery')).find(p => p.tag === 0x0d);
+  return p ? p.payload[0] : null;
+}
+async function firmware(ring) {
+  const p = (await ring.request([0x08, 0x03, 0x00, 0x00, 0x00], p => p.tag === 0x09, QUIET_MS, 'firmware')).find(p => p.tag === 0x09);
+  return p && p.payload.length >= 6 ? `${p.payload[3]}.${p.payload[4]}.${p.payload[5]}` : null;
+}
+async function syncTime(ring) {
+  const now = Math.floor(Date.now() / 1000);
+  const counter = Math.floor(now / 256);
+  const token = ((now & 255) * 37 + 0xa5) & 255;
+  await ring.request([0x12, 0x09, token, counter & 255, (counter >> 8) & 255, (counter >> 16) & 255, 0, 0, 0, 0, 0xf6], p => p.tag === 0x13, QUIET_MS, 'time sync');
+}
+async function enableFeatures(ring) {
+  // Daytime heart rate, blood oxygen, resting heart rate -> automatic (what a stock ring runs)
+  for (const [id, name] of [[0x02, 'daytime HR'], [0x04, 'SpO2'], [0x08, 'resting HR']]) {
+    const ps = await ring.request([0x2f, 0x03, 0x22, id, 0x01], p => isExt(p, 0x23), QUIET_MS, 'enable ' + name);
+    const r = ps.find(p => isExt(p, 0x23));
+    log(`enable ${name}: ${r ? 'result ' + r.payload[2] : 'no reply'}`);
+  }
+}
+
+// Reassemble extended (0x2f 0x43) envelopes into normal events.
+class EnvelopeParser {
+  constructor() { this.lenBuf = []; this.expected = null; this.payload = []; }
+  push(p) {
+    const out = [];
+    let data = Array.from(p.payload.slice(1));
+    while (data.length) {
+      if (this.expected === null) {
+        const take = Math.min(2 - this.lenBuf.length, data.length);
+        this.lenBuf.push(...data.slice(0, take)); data = data.slice(take);
+        if (this.lenBuf.length < 2) continue;
+        const len = this.lenBuf[0] | (this.lenBuf[1] << 8);
+        this.lenBuf = []; this.payload = [];
+        this.expected = len === 0 ? null : len;
+      }
+      if (this.expected !== null) {
+        const take = Math.min(this.expected - this.payload.length, data.length);
+        this.payload.push(...data.slice(0, take)); data = data.slice(take);
+        if (this.payload.length === this.expected) { out.push(...this.bundle()); this.payload = []; this.expected = null; }
+      }
+    }
+    return out;
+  }
+  bundle() {
+    const out = [], b = this.payload;
+    let i = 0, lastMs = null, lastTs = null;
+    while (i + 3 <= b.length) {
+      const tag = b[i + 1], extLen = b[i + 2], start = i + 3, end = start + extLen;
+      if (tag < 0x41 || end > b.length) break;
+      // varint
+      let v = 0, used = 0, ok = false;
+      for (let k = 0; k < 10 && start + k < end; k++) {
+        const byte = b[start + k];
+        v += (byte & 0x7f) * Math.pow(2, 7 * k);
+        if ((byte & 0x80) === 0) { used = k + 1; ok = true; break; }
+      }
+      if (!ok) break;
+      const ms = (lastMs !== null && v < 100000000) ? lastMs + v : v;
+      lastMs = ms;
+      let ts = Math.floor(ms / 100);
+      if (lastTs !== null && v > 0 && ts <= lastTs) ts = lastTs + 1;
+      lastTs = ts;
+      out.push({ tag, ts: ts >>> 0, body: hex(b.slice(start + used, end)) });
+      i = end;
+    }
+    return out;
+  }
+}
+
+function decodeBatch(packets) {
+  let bytesLeft = null, result = null;
+  const events = [];
+  const env = new EnvelopeParser();
+  for (const p of packets) {
+    if (p.tag === 0x11 && p.payload.length >= 6) bytesLeft = u32(p.payload, 2);
+    else if (isExt(p, 0x42) && p.payload.length >= 10) { bytesLeft = u32(p.payload, 4); result = p.payload[9]; }
+    else if (isExt(p, 0x43)) events.push(...env.push(p));
+    else if (p.tag >= 0x41 && p.payload.length >= 4) events.push({ tag: p.tag, ts: u32(p.payload, 0), body: hex(p.payload.slice(4)) });
+  }
+  if (bytesLeft === null) throw new Error('BATCH_NO_SUMMARY');
+  if (result !== null && result !== 0) throw new Error('BATCH_RESULT_' + result);
+  return { events, bytesLeft };
+}
+
+async function drainEvents(ring, cursor, onBatch) {
+  let start = cursor, total = 0, tail = 0, useExt = true, firstLeft = null;
+  const terminal = p => p.tag === 0x11 || (p.tag === 0x2f && (p.payload[0] === 0x42 || p.payload[0] === 0x00));
+  for (let pass = 0; pass < 2000; pass++) {
+    await ring.request([0x28, 0x01, 0x00], p => p.tag === 0x29, QUIET_MS, 'flush');
+    let packets;
+    if (useExt) {
+      packets = await ring.request([0x2f, 0x0c, 0x41, 0x00, ...le64(start * 100), EXT_BATCH_MAX & 255, EXT_BATCH_MAX >> 8], terminal, DRAIN_QUIET_MS, 'events (ext)');
+      if (packets.some(p => p.tag === 0x2f && p.payload[0] === 0x00)) {
+        log('extended sync not supported, using legacy');
+        useExt = false;
+      }
+    }
+    if (!useExt) {
+      packets = await ring.request([0x10, 0x09, ...le32(start), 255, 0xff, 0xff, 0xff, 0xff], terminal, DRAIN_QUIET_MS, 'events (legacy)');
+    }
+    const batch = decodeBatch(packets);
+    let maxTs = start, replayed = 0, rejected = 0;
+    const kept = batch.events.filter(e => {
+      if (e.ts < start) { replayed++; return false; }
+      if (e.ts > start + MAX_ADVANCE_DS) { rejected++; return false; }
+      if (e.ts > maxTs) maxTs = e.ts;
+      return true;
+    });
+    log(`batch: ${batch.events.length} events (${kept.length} new, ${replayed} repeat, ${rejected} bad), ${batch.bytesLeft} bytes left`);
+    if (firstLeft === null) firstLeft = batch.bytesLeft + 1;
+    const progressed = kept.length > 0 && maxTs + 1 > start;
+    const isTail = progressed && batch.bytesLeft === 0 && kept.length < TAIL_BATCH_EVENTS;
+    if (progressed) start = maxTs + 1;
+    total += kept.length;
+    await onBatch(kept, start, batch.bytesLeft, firstLeft);
+    if (!progressed) {
+      if (batch.bytesLeft === 0) break;
+      throw new Error('BATCH_STUCK');
+    }
+    if (isTail) { if (++tail >= MAX_TAIL_PASSES) break; } else tail = 0;
+  }
+  return { total, cursor: start };
+}
+
+// ---------------- flows ----------------
+function friendlyError(err) {
+  const m = (err && err.message) || String(err);
+  log('error: ' + (err && err.name ? err.name + ': ' : '') + m);
+  if (m === 'NO_BLUETOOTH') return ['Bluetooth isn’t available here', 'Open this page in the Bluefy app, not Safari.'];
+  if (err && err.name === 'NotFoundError') return ['No ring picked', 'Keep the ring close and try again. If it isn\u2019t in the list, tap \u201cShow all devices\u201d and pick the one that looks like a ring (it may have no name). Still nothing? Send Claude the log.'];
+  if (/encrypt|insufficient|auth.*fail|pair/i.test(m)) return ['iPhone pairing needed', 'If iPhone showed a Pair prompt, tap Pair and try again. If not: Settings → Bluetooth → tap ⓘ next to the Oura ring → Forget This Device, then try again.'];
+  if (m === 'SETKEY_FAILED') return ['The ring isn’t reset yet', 'It still has the Oura app’s lock on it. Do the factory reset steps first, then try again.'];
+  if (m === 'AUTH_WRONG_KEY') return ['The ring didn’t accept this phone’s key', 'The ring has a different key. If you reset it again, use “Forget ring” below and set it up fresh.'];
+  if (m === 'AUTH_RING_RESET') return ['The ring has been reset', 'Its key was erased. Use “Forget ring” below, then “Set up my ring” again.'];
+  if (m.startsWith('AUTH')) return ['Couldn’t unlock the ring', 'Send Claude the log.'];
+  if (m.startsWith('BATCH')) return ['Sync stopped partway', 'What was downloaded is saved. Tap Sync again to continue. If it keeps happening, send Claude the log.'];
+  if (/disconnect|gatt|network/i.test(m)) return ['Lost connection to the ring', 'Keep the ring close to the phone and try again. Anything already downloaded is saved.'];
+  return ['Something went wrong', 'Send Claude the log.'];
+}
+
+async function doSetup(showAll) {
+  $('rows').innerHTML = '';
+  const ring = new Ring();
+  $('setupBtn').disabled = true;
+  try {
+    setStatus('Connecting…', 'warn', 'Pick your ring from the list. If iPhone asks to Pair, tap Pair.');
+    await ring.connect();
+
+    // Reuse an existing unconfirmed key so a retry never strands a key on the ring.
+    let keyHex = store.get('key');
+    if (!keyHex) {
+      const k = crypto.getRandomValues(new Uint8Array(16));
+      keyHex = hex(k);
+      if (!store.set('key', keyHex)) throw new Error('STORAGE_FAILED');
+      log('new key created and saved on this phone');
+    } else log('reusing saved key');
+    const key = fromHex(keyHex);
+
+    setStatus('Installing your key…', 'warn');
+    const ps = await ring.request([0x24, 0x10, ...key], p => p.tag === 0x25, QUIET_MS, 'set key');
+    const r = ps.find(p => p.tag === 0x25);
+    log('set key result: ' + (r ? r.payload[0] : 'none'));
+    if (!r || r.payload[0] !== 0) throw new Error('SETKEY_FAILED');
+    log('this phone\u2019s key is now on the ring');
+
+    setStatus('Unlocking…', 'warn');
+    await authenticate(ring, key);
+    store.set('paired', '1');
+
+    setStatus('Turning on heart rate and blood oxygen…', 'warn');
+    await enableFeatures(ring);
+    await syncTime(ring);
+    const bat = await battery(ring);
+    const fw = await firmware(ring);
+
+    setStatus('✅ Your ring is set up', 'good', 'It’s now locked to this phone. Wear it tonight, then tap Sync tomorrow. Send Claude the log so we can check everything went through.');
+    if (bat !== null) addRow('rows', 'Battery', bat + '%');
+    if (fw) addRow('rows', 'Firmware', fw);
+    render();
+  } catch (err) {
+    const [t, e] = friendlyError(err);
+    setStatus(t, 'bad', e);
+  } finally {
+    ring.disconnect();
+    $('setupBtn').disabled = false;
+  }
+}
+
+async function doSync() {
+  $('rows').innerHTML = '';
+  const ring = new Ring();
+  $('syncBtn').disabled = true;
+  try {
+    setStatus('Connecting…', 'warn', 'Pick your ring from the list.');
+    progress(3);
+    await ring.connect();
+    await authenticate(ring, fromHex(store.get('key')));
+    await syncTime(ring).catch(e => log('time sync failed: ' + e.message));
+    await ring.request([0x28, 0x01, 0x00], p => p.tag === 0x29, QUIET_MS, 'sleep analysis').catch(() => {});
+    const bat = await battery(ring).catch(() => null);
+
+    const cursor = parseInt(store.get('cursor') || '0', 10);
+    setStatus('Downloading…', 'warn', 'Keep the ring close. The first sync can take a few minutes.');
+    let got = 0;
+    const res = await drainEvents(ring, cursor, async (events, next, left, firstLeft) => {
+      await saveEvents(events);
+      store.set('cursor', String(next));   // checkpoint after each saved batch
+      got += events.length;
+      progress(firstLeft ? 100 * (1 - left / firstLeft) : 50);
+      $('explain').textContent = `${got.toLocaleString()} readings so far…`;
+    });
+    progress(100);
+    store.set('lastSync', String(Date.now()));
+    setStatus('✅ Synced', 'good', `${res.total.toLocaleString()} new readings saved on this phone.`);
+    if (bat !== null) addRow('rows', 'Battery', bat + '%');
+    render();
+  } catch (err) {
+    const [t, e] = friendlyError(err);
+    setStatus(t, 'bad', e);
+  } finally {
+    ring.disconnect();
+    $('syncBtn').disabled = false;
+    setTimeout(() => $('barWrap').classList.add('hidden'), 1500);
+  }
+}
+
+// ---------------- summary of stored data ----------------
+async function renderData() {
+  let events = [];
+  try { events = await allEvents(); } catch (_) {}
+  $('dataRows').innerHTML = '';
+  if (!events.length) { $('dataCard').classList.add('hidden'); return; }
+  $('dataCard').classList.remove('hidden');
+  // Map ring time (deciseconds since boot) to real time using the newest time_sync event.
+  const syncs = events.filter(e => e.tag === 0x42 && e.body.length >= 8).sort((a, b) => b.ts - a.ts);
+  const toDate = ts => {
+    const s = syncs.find(x => x.ts <= ts) || syncs[0];
+    if (!s) return null;
+    const unix = u32(fromHex(s.body.slice(0, 8)), 0);
+    return new Date((unix + (ts - s.ts) / 10) * 1000);
+  };
+  const tsList = events.map(e => e.ts);
+  const first = toDate(Math.min(...tsList)), last = toDate(Math.max(...tsList));
+  const fmt = d => d && !isNaN(d) ? d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
+  addRow('dataRows', 'Total readings', events.length.toLocaleString());
+  addRow('dataRows', 'From', fmt(first));
+  addRow('dataRows', 'To', fmt(last));
+  const counts = {};
+  for (const e of events) counts[e.tag] = (counts[e.tag] || 0) + 1;
+  for (const [name, tags] of CATEGORIES) {
+    const n = tags.reduce((s, t) => s + (counts[t] || 0), 0);
+    addRow('dataRows', name, n ? n.toLocaleString() : 'none yet');
+  }
+  log('stored event types: ' + Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${EVENT_NAMES[t] || '0x' + Number(t).toString(16)}=${n}`).join(', '));
+}
+
+function render() {
+  const paired = store.get('paired') === '1';
+  const key = store.get('key');
+  $('setupCard').classList.toggle('hidden', paired);
+  $('syncCard').classList.toggle('hidden', !paired);
+  $('keyCard').classList.toggle('hidden', !key);
+  $('keyShow').textContent = key || '';
+  const last = store.get('lastSync');
+  $('lastSync').textContent = last ? 'Last synced ' + new Date(+last).toLocaleString() : 'Not synced yet.';
+  renderData();
+}
+
+// ---------------- buttons ----------------
+$('setupBtn').onclick = () => doSetup(false);
+$('setupAllBtn').onclick = () => doSetup(true);
+$('syncBtn').onclick = doSync;
+$('copyKey').onclick = async () => {
+  try { await navigator.clipboard.writeText(store.get('key') || ''); $('copyKey').textContent = 'Copied — paste it in Notes'; }
+  catch (_) { $('copyKey').textContent = 'Press and hold the key above to copy'; }
+  setTimeout(() => $('copyKey').textContent = 'Copy key', 3000);
+};
+$('restoreKey').onclick = () => {
+  const v = $('keyInput').value.trim().toLowerCase().replace(/[^0-9a-f]/g, '');
+  if (v.length !== 32) { $('restoreKey').textContent = 'That doesn’t look right (needs 32 characters)'; setTimeout(() => $('restoreKey').textContent = 'Use this key', 3000); return; }
+  store.set('key', v); store.set('paired', '1'); $('keyInput').value = '';
+  $('restoreKey').textContent = 'Saved'; setTimeout(() => $('restoreKey').textContent = 'Use this key', 2000);
+  render();
+};
+let forgetArmed = false;
+$('forget').onclick = async () => {
+  if (!forgetArmed) { forgetArmed = true; $('forget').textContent = 'Tap again to confirm (copy your key first!)'; setTimeout(() => { forgetArmed = false; $('forget').textContent = 'Forget ring and data on this phone'; }, 5000); return; }
+  ['key', 'paired', 'cursor', 'lastSync'].forEach(store.del);
+  try { await clearEvents(); } catch (_) {}
+  forgetArmed = false; $('forget').textContent = 'Forget ring and data on this phone';
+  $('resultCard').classList.add('hidden');
+  render();
+};
+$('copyLog').onclick = async () => {
+  try { await navigator.clipboard.writeText(logLines.join('\n')); $('copyLog').textContent = 'Copied!'; }
+  catch (_) { $('copyLog').textContent = 'Press and hold the log to copy it'; }
+  setTimeout(() => $('copyLog').textContent = 'Copy log', 2500);
 };
 
-$('copy').onclick = async () => {
-  try { await navigator.clipboard.writeText(logLines.join('\n')); $('copy').textContent = 'Copied!'; }
-  catch (_) { $('copy').textContent = 'Press and hold the log to copy it'; }
-  setTimeout(() => $('copy').textContent = 'Copy log', 2500);
-};
+render();
 </script>
 </body>
 </html>
